@@ -37,7 +37,7 @@ public:
 	double** backpropagation(double *target, double *input, double *output, double learn_rate, double* hidden_out);
 	void set_weights(double *new_weights);
 	void set_biases(double *new_biases);
-	void SGD(vector< vector<double> >training_input, vector< vector<double> >training_output, int data_num, int batch_size, double learning_rate);
+	void SGD(vector< vector<double> >training_input, vector< vector<double> >training_output, int data_num, int batch_size, double learning_rate, vector< vector<double> > testing_input, vector< vector<double> >testing_output, int test_data_num);
 	double *eval(vector<vector<double>> testing_input, vector<vector<double>> testing_output, int data_num);
 };
 
@@ -160,7 +160,8 @@ void Network::display_layer(int layer) {
 		cout << "No weights or biases for the input layer..." << endl;
 		break;
 	case 1:
-		for (int i = 0; i < size_hidden; i++) {
+		//for (int i = 0; i < size_hidden; i++) {
+		for (int i = 0; i < 1; i++) {
 			cout << "Hidden Layer Node " << i << " bias: " << biases[i] << endl;
 			for (int j = 0; j < size_in; j++) {
 				//DEBUG
@@ -245,7 +246,6 @@ double** Network::backpropagation(double *target, double*input, double *output, 
 			det_doh = 0;
 			for (int j = 0; j < size_out; j++) {
 				//uses previous results
-				//NO - 
 				deo_dno = de_do[j] * do_dn[j]; 
 				//index for weights finds weight connecting hidden node to output node 
 				deo_doh = deo_dno*weights[size_hidden*size_in + j*size_hidden + k];
@@ -283,10 +283,11 @@ double** Network::backpropagation(double *target, double*input, double *output, 
 	for (int k = 0; k < size_hidden; k++)
 	{
 		det_doh = 0;
-		for (int j = 0; j < size_in; j++) {
+		for (int j = 0; j < size_out; j++) {
 			//uses previous results
 			deo_dno = de_do[j] * do_dn[j];
 			//index for weights finds weight connecting hidden node to output node 
+			//ERROR: j should be [0,size_out] NOT [0,size_hidden]
 			deo_doh = deo_dno*weights[size_hidden*size_in + j*size_hidden + k];
 			det_doh += deo_doh;
 		}
@@ -347,28 +348,38 @@ void Network::set_biases(double *new_biases) {
 }
 
 //performs minibatching stochastic gradient descent
-void Network::SGD(vector< vector<double> > training_input, vector< vector<double> >training_output, int data_num, int batch_size, double learning_rate) {
+void Network::SGD(vector< vector<double> > training_input, vector< vector<double> >training_output, int data_num, int batch_size, double learning_rate, vector< vector<double> > testing_input, vector< vector<double> >testing_output, int test_data_num) {
 	//net->display_layer(1);
 	//net->display_layer(2);
 	//will be used to store running sum of test weights
 	double *batch_weights; 
 	double *batch_biases;
 	//one epoch loop
-	ofstream myfile;
+	//ofstream myfile;
 	//UNDO: changed location of weight file
-	myfile.open("C:\\Users\\sahol\\Desktop\\Deep Learning\\SGD.txt");
+	//myfile.open("C:\\Users\\sahol\\Desktop\\Deep Learning\\SGD.txt");
 	
 	//looping for 1000 epochs 
-	for (int e = 0; e < 20000; e++)
+	for (int e = 0; e < 10000; e++)
 	{
-		double *final_error = this->eval(training_input, training_output, data_num);
+		//evaluate the network every 200 epochs
+		if(e%200==0){
+			double *final_error = this->eval(testing_input, testing_output, test_data_num);
+			//now run eval on the weights
+			double sum = 0;
+			for (int i = 0; i < size_out; i++)
+			{
+				sum += final_error[i];
+			}
+		}
+		
 		cout << "epoch" << e << endl;
 		//UNDO
 		//for (int b = 0; b < data_num / batch_size; b++)
 		for (int b = 0; b < 1; b++)
 		{
-			this->display_layer(2);
-			this->display_layer(1);
+			//this->display_layer(2);
+			//this->display_layer(1);
 			//reallocate and free batch_weights every batch
 			batch_weights = new double[total_weights];
 			batch_biases = new double[total_nodes - size_in];
@@ -387,7 +398,7 @@ void Network::SGD(vector< vector<double> > training_input, vector< vector<double
 				//WARNING: data is deallocated after each minibatch
 				//we can convert vector to double pointer since addressing is garunteed contiguous
 				//int ind = rand() % 4;
-				r = rand() % 4;
+				r = rand() % data_num;
 				cout << "RAND = " << r << endl;
 				double *test_input = &training_input[r][0];//i + batch_size*b][0];
 				//cout << "Test input: " << test_input[0]<<" "<<test_input[1]<<endl;
@@ -423,7 +434,7 @@ void Network::SGD(vector< vector<double> > training_input, vector< vector<double
 			for (int j = 0; j < total_weights; j++) {
 
 				batch_weights[j] = batch_weights[j] / batch_size;
-				cout << "batch weight: " << batch_weights[j] << endl;
+				//cout << "batch weight: " << batch_weights[j] << endl;
 				//while setting the batch_weights we can also write out our updated weights to a file
 				//UNDO: commenting out for testing static network
 				//myfile << batch_weights[j] << " ";
@@ -436,18 +447,12 @@ void Network::SGD(vector< vector<double> > training_input, vector< vector<double
 				//UNDO:
 				//myfile << batch_biases[j] << " ";
 			}
-			//now run eval on the weights
-			double sum = 0;
-			for (int i = 0; i < size_out; i++)
-			{
-				sum += final_error[i];
-			}
 			//UNDO:
 			//myfile << batch_weights[VARY_WEIGHT] << " ";
-			myfile << batch_biases[VARY_BIAS] << " ";
-			myfile << sum / size_out;
+			//myfile << batch_biases[VARY_BIAS] << " ";
+			//myfile << sum / size_out;
 			//TODO: smaller network can fit all weights on one line, will malfunction later
-			myfile << "\n";
+			//myfile << "\n";
 			this->set_weights(batch_weights);
 			this->set_biases(batch_biases);
 			cout << "batch :" << b << endl;
@@ -457,13 +462,13 @@ void Network::SGD(vector< vector<double> > training_input, vector< vector<double
 			//}
 			//cout << "middle first: "<<weights[2]<<" last "<<weights[size_in*size_hidden+(size_out*size_hidden)-1]<<endl;
 			//cout << "bias first: " << biases[0] << " last " << biases[size_out + size_hidden - 1] << endl;
-			this->display_layer(2);
-			this->display_layer(1);
+			//this->display_layer(2);
+			//this->display_layer(1);
 			delete batch_weights;
 			delete batch_biases;
 		}
 	}
-	myfile.close();
+	//myfile.close();
 	//this->display_layer(2);
 	//this->display_layer(1);
 }
@@ -491,15 +496,17 @@ double* Network::eval(vector< vector<double> > testing_input, vector< vector<dou
 		//double label_out = 0;
 		//NOTE change line below if testing input changes
 		//UNDO: uncomment the cout below
-		cout << "input: " << testing_input[i][0] << " " << testing_input[i][1] << endl;
-		cout << "\ttarget: " << test_target[0] << " output: " << test_output[0] <<endl;
+		//cout << "input: " << testing_input[i][0] << " " << testing_input[i][1] << endl;
+		//cout << "\ttarget: " << test_target[0] << " output: " << test_output[0] <<endl;
 		for (int j = 0; j < size_out; j++) {
 			//should make error rate decrease
 			//if (test_output[j] > .1) { test_output[j] = 1; }
 			//else { test_output[j] = 0; }
 			error = pow((test_target[j] - test_output[j]), 2.0) / 2;
-			//cout << "\ttarget: " << test_target[j] << " output: " << test_output[j] <<endl;
-			cout << "\tData "<<i<<" Output node "<<j<<" Error: " << error << endl;
+			//if(i%(data_num/4)==0)
+			cout << "\ttarget: " << test_target[j] << " output: " << test_output[j] <<endl;
+			
+			//cout << "\tData "<<i<<" Output node "<<j<<" Error: " << error << endl;
 			error_final[j] += error;
 		}
 		//QUESTION: if a pixel input is always 0 does the weight ever change?
@@ -530,7 +537,7 @@ void read_Mnist(string filename, vector<vector<double> > &vec, int data_num)
 	{
 		int magic_number = 0x00000803;
 		//placeholder value is replaced later
-		int number_of_images = 600;
+		int number_of_images = 1000;
 		int n_rows = 28;
 		int n_cols = 28;
 		file.read((char*)&magic_number, sizeof(magic_number));
@@ -565,7 +572,7 @@ void read_Mnist_Label(string filename, vector<double> &vec, int data_num)
 	if (file.is_open())
 	{
 		int magic_number = 0x00000801;
-		int number_of_images = 600; //is replaced later
+		int number_of_images = 1000; //is replaced later
 		int n_rows = 0; //doesn't matter
 		int n_cols = 0;
 		file.read((char*)&magic_number, sizeof(magic_number));
@@ -582,126 +589,81 @@ void read_Mnist_Label(string filename, vector<double> &vec, int data_num)
 	}
 }
 int main() {
-	/*
 	//net is dynamic 2x2x2 instance of network class we will use to test our functions
 	//TODO: scale up the test for 100 input/output batch size 20
-	int data_num = 1000;
-	vector<vector<double>> ar_images(data_num, vector<double>(2));
-	for (int i = 0; i < data_num; i++) {
-		ar_images[i][0] = rand() % 2;
-		ar_images[i][1] = rand() % 2;
-	}
-	//read_Mnist("C:\\train-images.idx3-ubyte", ar_images, data_num);
+	int data_num = 10000;
+	vector<vector<double>> ar_images;
+	read_Mnist("C:\\train-images.idx3-ubyte", ar_images, data_num);
 	//DEBUG
 	//need to normalize the data to prevent vanishing gradient
 	//when the input is above threshold map to 1 else 0
-	//int bw_threshold = 10;
-	//for (int i = 0; i < data_num; i++) {
-	//	for(int j=0; j<784;j++)
-	//	{	
-	//		if (ar_images[i][j] > bw_threshold) {
-	//			ar_images[i][j] = 1;
-	//		}
-	//		else {
-	//			ar_images[i][j] = 0.0;
-	//		}
-	//	}
-	//
-	//}
-	//vector<double> ar_labels(data_num);
-	//read_Mnist_Label("C:\\train-labels.idx1-ubyte", ar_labels, data_num);
+	int bw_threshold = 10;
+	for (int i = 0; i < data_num; i++) {
+		for(int j=0; j<784;j++)
+		{	
+			if (ar_images[i][j] > bw_threshold) {
+				ar_images[i][j] = 1;
+			}
+			else {
+				ar_images[i][j] = 0.0;
+			}
+		}
+	
+	}
+	vector<double> ar_labels(data_num);
+	read_Mnist_Label("C:\\train-labels.idx1-ubyte", ar_labels, data_num);
 	vector<vector<double>> ar_labels_wrapper(data_num,vector<double>(1));
 	
 	for (int i = 0; i < data_num; i++){
-		if ((ar_images[i][0] == 0 && ar_images[i][1] == 0) || (ar_images[i][0] == 1 && ar_images[i][1] == 1)) {
-			ar_labels_wrapper[i][0] = 0;
+		//UNDO: turned this into a binary classification problem
+		//set up ar_labels_wrapper to transform label data from [0,9] to binary vector
+		//for(int j=0;j<10;j++)
+		//{
+		//	ar_labels_wrapper[i][j] = double((int(ar_labels[i]) == j));//instead of creating switch case
+		//}
+		if (ar_labels[i] == 1)
+		{
+			ar_labels_wrapper[i][0] = 1;
 		}
 		else
 		{
-			ar_labels_wrapper[i][0] = 1;
-		}
-	}
-	//the 10 neurons at the end will be confidence classes of the digits
-	//e.g. if neuron 3 is .3 then there is a low chance that it is a 3
-	//TODO: implement softmax for the classification layer
-	Network *net = new Network(2, 2, 1);
-	*/
-	int data_num = 1000;
-	vector<vector<double>> ar_images(data_num, vector<double>(2));
-	for (int i = 0; i < data_num; i++) {
-		ar_images[i][0] = rand() % 2;
-		ar_images[i][1] = rand() % 2;
-	}
-	vector<vector<double>> ar_labels_wrapper(data_num, vector<double>(2));
-
-	for (int i = 0; i < data_num; i++) {
-		if(ar_images[i][0]==ar_images[i][1])
-		{
-			ar_labels_wrapper[i][0] = 1;
-			ar_labels_wrapper[i][1] = 0; 
-		}
-		else {
 			ar_labels_wrapper[i][0] = 0;
-			ar_labels_wrapper[i][1] = 1;
 		}
-		
 	}
-	//new training vectors
-	vector<vector<double>> test_train_data(4, vector<double>(2));
-	test_train_data[0][0] = 0;
-	test_train_data[0][1] = 0;
-	test_train_data[1][0] = 0;
-	test_train_data[1][1] = 1;
-	test_train_data[2][0] = 1;
-	test_train_data[2][1] = 0;
-	test_train_data[3][0] = 1;
-	test_train_data[3][1] = 1;
-	vector<vector<double>> test_target_data(4, vector<double>(1));
-	test_target_data[0][0] = 1;
-	test_target_data[1][0] = 0;
-	test_target_data[2][0] = 0;
-	test_target_data[3][0] = 1;
-	//initial weights
-	vector<double> init_weights{ .484035, .651076, 1.55911, 1.61222, -.765576, 2.30683, -1.26865, 2.84205 };
-	//initial biases
-	//1.14698
-	vector<double> init_biases{ -.0554889, -2, -1.60412, -1.76589 };
-	Network *net;// = new Network(2, 2, 1);// , init_weights, init_biases);
-	//map error surface
+	//now we will reduce the training set to only detect the digit one
+	vector<vector<double>> ar_labels_wrapper_ones;
+	vector<vector<double>> ar_images_ones;
+
+	for (int i = 0; i < data_num; i++)
+	{
+		//if (ar_labels_wrapper[i][0] == 1)
+		//{
+		ar_labels_wrapper_ones.push_back(ar_labels_wrapper[i]);
+		ar_images_ones.push_back(ar_images[i]);
+		//}
+	}
+	data_num = ar_images_ones.size();
+	//construct the testing set
+	vector<vector<double>> ar_test_labels_ones;
+	vector<vector<double>> ar_test_images_ones;
+	int test_data_num = 40;
+	for (int i = 0; i < test_data_num; i++)
+	{
+		ar_test_labels_ones.push_back(ar_labels_wrapper_ones[i]);
+		ar_test_images_ones.push_back(ar_images_ones[i]);
+	}
 	//one epoch loop
 	ofstream myfile;
 	double *final_error;
 	double error;
-	//UNDO: changed location of weight file
-	myfile.open("C:\\Users\\sahol\\Desktop\\Deep Learning\\error_surface.txt");
-	for (double i = 0; i < 0; i = i+ .001)
-	{
-		//init_weights[VARY_WEIGHT] = i;
-		init_biases[VARY_BIAS] = i ;
-		net = new Network(2, 2, 2, init_weights, init_biases);
-		error = 0;
-		final_error = net->eval(test_train_data, test_target_data, 4);
-		for (int i = 0; i < net->size_out; i++) {
-			//cout << "Final Error Output Node " << i << ": " << final_error[i] << endl;
-			error += final_error[i];
-		}
-		//myfile << net->weights[VARY_WEIGHT] << " " << error/ net->size_out << endl;
-		myfile << net->biases[VARY_BIAS] << " " << error / net->size_out << endl;
-	}
-	myfile.close();
-	//train the network
-	init_weights= { 1,1,-1,-1,1,1 };
-	//initial biases
-	//1.14698
-	init_biases = { .5,-1.5,1.5 };
-	net = new Network(2, 2, 1);// , init_weights, init_biases);
-	net->SGD(test_train_data, test_target_data, 4, 1, 3);
+	Network *net = new Network(784, 100, 1);// , init_weights, init_biases);
+	net->SGD(ar_images, ar_labels_wrapper, data_num, 1, 3, ar_test_images_ones, ar_test_labels_ones, test_data_num);
 	//test on the same set of data
-	double *final_error_2 = net->eval(test_train_data, test_target_data, 4);
+	double *final_error_2 = net->eval(ar_test_images_ones, ar_test_labels_ones, test_data_num);
 	for (int i = 0; i < net->size_out; i++) {
 		cout << "Final Error Output Node " << i << ": " << final_error_2[i]<<endl;
 	}
-	net->display_layer(2);
+	//net->display_layer(2);
 	net->display_layer(1);
 	system("pause");
 	return 0;
